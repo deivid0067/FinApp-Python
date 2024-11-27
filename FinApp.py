@@ -1,3 +1,9 @@
+#Projeto Conta Corrente
+#Deivid Menezes da Silva - UMC
+#Engenharia de Software - NOTURNO
+
+#------------------------ Libs ------------------------# 
+
 import os
 import sys
 import uuid
@@ -6,27 +12,37 @@ import re
 import datetime
 from prettytable import PrettyTable
 
+#------------------------ Globals ------------------------# 
 users = []
 user_db = 'users_db.txt'
 
+def clear_console():
+    input('\nPressione Enter para finalizar...')
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def load_accounts(users):
+    user_ids = set()
+
     try:
         with open(user_db, 'r') as db:
             for linha in db:
                 dados = linha.rstrip().split(', ')
                 if len(dados) == 6:
                     user_id, username, cpf, email, senha, saldo = dados
-                    users.append({
-                        'id': user_id,
-                        'username': username,
-                        'cpf': cpf,
-                        'email': email,
-                        'senha': senha,
-                        'saldo': float(saldo)
-                    })
+                    if user_id not in user_ids:
+                        users.append({
+                            'id': user_id,
+                            'username': username,
+                            'cpf': cpf,
+                            'email': email,
+                            'senha': senha,
+                            'saldo': float(saldo)
+                        })
+                        user_ids.add(user_id)
     except FileNotFoundError:
         print("Banco de dados não encontrado, criando um novo arquivo...")
+load_accounts(users)
+
 
 def login():
     print('\nBem-vindo ao FinBank. Para fazer o login, digite seu nome de usuário ou e-mail e sua senha.')
@@ -35,19 +51,18 @@ def login():
         username_or_email = input('Digite o nome de usuário ou email: ')
         senha = input('Digite sua senha: ')
         current_user = None
-
         for user in users:
             authentication = (user['email'] == username_or_email or user['username'] == username_or_email) and user[
                 'senha'] == senha
             if authentication:
                 current_user = user
                 break
-
         if current_user:
             account(current_user)
             break
         else:
             print('\n Credenciais Inválidas')
+
 
 def extract(current_user, deposit_values, statement):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -114,7 +129,7 @@ def withdrawal(current_user, withdrawal_value, statement):
         except ValueError as vew:
             print(f'Erro: {ve}')
 
-def deposit(current_user, deposit_value, statement):
+def deposit(current_user, deposit_value, statement): 
 
     try:
         if deposit_value <= 0:
@@ -144,7 +159,7 @@ def account(current_user):
     4 - Sair da Aplicação
 
     '''))
-
+    
     if option not in ['1', '2', '3', '4']:
 
         print('\nSelecione uma opção Válida')
@@ -164,30 +179,29 @@ def account(current_user):
             print("Erro: Por favor, digite um valor válido para o depósito (número).")
 
     elif option == '3':
-        transactions = load_transactions(current_user['username'])
+        transactions = load_transactions(current_user['username'])  # Carrega as transações
 
         os.system('cls')
 
         print('\n-------------------- EXTRATO BANCARIO --------------------')
 
         if transactions:
-
             table_extract = PrettyTable()
-
             table_extract.field_names = ["ID", "Tipo", "Valor (R$)", "Data"]
 
+            # Adiciona todas as transações à tabela
             for transaction in transactions:
                 table_extract.add_row([transaction['id'], transaction['type'],
-                               f"R$ {transaction['value']:.2f}", transaction['date']])
-                print(table_extract)
+                                       f"R$ {transaction['value']:.2f}", transaction['date']])
 
-                optionContinue = input('\nAperte Enter, se deseja retornar para o Menu principal, caso contrario pressione'
-                                       'outra tecla')
+            print(table_extract)  # Exibe a tabela inteira de transações
 
-                if optionContinue in ['', ' ']:
-                    account(current_user)
-                else:
-                    print('Finalizando')
+            # Pergunta se deseja continuar ou sair
+            optionContinue = input('\nAperte Enter, se deseja retornar para o Menu principal, caso contrario pressione outra tecla')
+            if optionContinue in ['', ' ']:
+                account(current_user)  # Volta ao menu principal
+            else:
+                print('Finalizando')
 
         else:
             print('Nenhuma transação, Encontrada!')
@@ -202,6 +216,11 @@ def cpf_validation(cpf):
 
     if cpf == cpf[0] * 11:
         return False
+
+    for userCpf in users:
+        if userCpf['cpf'] == cpf:
+            print('\nJá existe um usuário com esse CPF')
+            return False
 
     return True
 
@@ -287,21 +306,28 @@ def create_account():
 
     Pressione Enter pra retornar ao inicio!
     '''))
+
+    clear_console()
     save_account(users)
+    menu()
 
 def save_account(users):
+    user_ids = set()  # Para armazenar os IDs dos usuários já salvos
+
     with open(user_db, 'w') as db:
         for user_information in users:
-            linha = (f"{user_information['id']}, "
-                     f"{user_information['username']}, "
-                     f"{user_information['cpf']}, "
-                     f"{user_information['email']}, "
-                     f"{user_information['senha']}, "
-                     f"{user_information['saldo']}\n")  # Salva o saldo junto
-            db.write(linha)
+            # Verificar se o ID do usuário já foi gravado
+            if user_information['id'] not in user_ids:
+                linha = (f"{user_information['id']}, "
+                         f"{user_information['username']}, "
+                         f"{user_information['cpf']}, "
+                         f"{user_information['email']}, "
+                         f"{user_information['senha']}, "
+                         f"{user_information['saldo']}\n")  # Salva o saldo junto
+                db.write(linha)
+                user_ids.add(user_information['id']) # Caso ele duplique o Id
 
 def menu():
-    load_accounts(users)
 
     while True:
 
@@ -320,7 +346,7 @@ def menu():
     (1) - Fazer Login
     (2) - Criar Conta
     (3) - Relatório de Usuários Cadastrados
-    (4) - Alterar Email e Senha
+    (4) - Pesquisar usuarios por CPF
     (5) - Excluir Usuário 
     (6) - Sair da aplicação
     ===> '''))
@@ -336,11 +362,20 @@ def menu():
         elif selectOption == '3':
             for user in users:
                 print(user)
-            break
+            clear_console()
         elif selectOption == '4':
-            print('')
+
+            search = input('Digite o CPF Pra receber informações do Usuário')
+            for searchUser in users:
+                if searchUser['cpf'] == search:
+                    print(textwrap.dedent(f'''
+                        Pesquisa de Usuário Concluída!
+
+                        |{searchUser['username']} | {searchUser['email']} | {searchUser['saldo']} | <----- Resultado
+                        '''))
+            clear_console()        
+            
         elif selectOption == '5':
             delete_user()
             sys.exit(0)
-
 menu()
