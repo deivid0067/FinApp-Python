@@ -35,35 +35,206 @@ def load_accounts(users):
 load_accounts(users)
 
 def fazer_login():
-
     root.destroy()
     
     login = Tk()
     login.title("Tela de Login")
     login.geometry('500x300')
     
-    # Título centralizado
     title = Label(login, text="Bem-vindo à tela de Login", font=("Verdana", "10", "italic", "bold"), fg="red", bg="#d6d6d6")
     title.pack(pady=20)  
 
-    # Campo de Nome de Usuário ou E-mail
     username_or_email_label = Label(login, text="Nome de Usuário ou E-mail:")
     username_or_email_label.pack(pady=5)
     username_or_email = Entry(login, width=30)
     username_or_email.pack(pady=5)
 
-    # Campo de Senha
     senha_label = Label(login, text="Digite sua senha:")
     senha_label.pack(pady=5)
     
     senha = Entry(login, width=30, show="*")
     senha.pack(pady=5)
 
-    # Botão de Login
-    login_button = Button(login, text="Login", width=20)
+    login_button = Button(login, text="Login", width=20, command=lambda: realizar_login(username_or_email, senha, login))
     login_button.pack(pady=20)
 
     login.mainloop()
+
+def realizar_login(username_or_email, senha, login_window):
+    if not username_or_email.get() or not senha.get():
+        messagebox.showerror("Erro", "Por favor, preencha os campos de login e senha.")
+        return
+
+    current_user = None
+
+    for user in users:
+        authentication = (user['email'] == username_or_email.get() or user['username'] == username_or_email.get()) and user['senha'] == senha.get()
+        if authentication:
+            current_user = user
+            break
+
+    if current_user:
+        account(current_user)
+        login_window.destroy()  
+    else:
+        messagebox.showerror("Erro", "Credenciais Inválidas")
+
+def extract(current_user, deposit_values, statement):
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for value in deposit_values:
+        if value < 0:
+            transaction = {
+                'type': 'Saque',
+                'value': value,
+                'user': current_user['username'],
+                'id': str(uuid.uuid4()),  
+                'date': current_datetime
+            }
+        else:
+            transaction = {
+                'type': 'Deposito',
+                'value': value,
+                'user': current_user['username'],
+                'id': str(uuid.uuid4()),  
+                'date': current_datetime
+            }
+        statement.append(transaction)
+        save_transaction(transaction)
+
+def load_transactions(username):
+    user_statement_file = f"extrato_{username}.txt"
+    transactions = []
+
+    try:
+        with open(user_statement_file, 'r') as file:
+            for line in file:
+                transaction_data = line.strip().split(',')
+
+                if len(transaction_data) == 5:
+                    transaction = {
+                        'id': transaction_data[0],
+                        'type': transaction_data[1],
+                        'value': float(transaction_data[2]),
+                        'user': transaction_data[3],
+                        'date': transaction_data[4]
+                    }
+                    transactions.append(transaction)
+
+    except FileNotFoundError:
+        print(f"Arquivo de extrato para o usuário {username} não encontrado.")
+
+    return transactions
+
+def save_transaction(transaction):
+    user_statement_file = f"extrato_{transaction['user']}.txt"
+
+    with open(user_statement_file, 'a') as file:
+        line = f"{transaction['id']},{transaction['type']},{transaction['value']},{transaction['user']},{transaction['date']}\n"
+        file.write(line)
+
+def withdrawal(current_user, withdrawal_value, statement):
+    if current_user['saldo'] < withdrawal_value:
+        messagebox.showerror("Erro", 'Saldo insuficiente para realizar o saque.')
+    else:
+        try:
+            if withdrawal_value <= 0:
+                raise ValueError("O valor do saque deve ser maior que zero.")
+
+            print(f"Saque de R$ {withdrawal_value} realizado com sucesso.")
+            extract(current_user, [-withdrawal_value], statement)
+
+            current_user['saldo'] -= withdrawal_value
+            update_balance_label(current_user)
+
+        except ValueError as vew:
+            messagebox.showerror("Erro", str(vew))
+
+def deposit(current_user, deposit_value, statement): 
+    try:
+        if deposit_value <= 0:
+            raise ValueError("O valor do depósito deve ser maior do que zero.")
+
+        print(f"Depósito de R$ {deposit_value} realizado com sucesso.")
+        extract(current_user, [deposit_value], statement)  
+
+        current_user['saldo'] += deposit_value
+        update_balance_label(current_user)  
+
+    except ValueError as vew:
+        messagebox.showerror("Erro", str(vew))
+
+def update_balance_label(current_user):
+    saldo_label.config(text=f"Saldo Atual: R$ {current_user['saldo']:.2f}")
+    atualizar_treeview(current_user)
+
+def atualizar_treeview(current_user):
+    for i in tree.get_children():
+        tree.delete(i)
+    
+    statement = load_transactions(current_user['username'])
+    for transacao in statement:
+        tree.insert('', 'end', values=(transacao['type'], transacao['value'], transacao['date']))
+
+def account(current_user):
+    global saldo_label, tree
+    statement = []
+
+    conta = Toplevel()
+    conta.title(f"Conta de {current_user['username']}")
+    conta.geometry('600x500')
+
+    title = Label(conta, text=f"Bem-vindo, {current_user['username']}", font=("Verdana", "10", "italic", "bold"), fg="blue")
+    title.pack(pady=20)
+
+    saldo_label = Label(conta, text=f"Saldo Atual: R$ {current_user['saldo']:.2f}", font=("Verdana", "12", "bold"), fg="green")
+    saldo_label.pack(pady=10)
+
+    valor_label = Label(conta, text="Digite o valor:")
+    valor_label.pack(pady=5)
+    valor_entry = Entry(conta, width=30)
+    valor_entry.pack(pady=5)
+
+    def depositar():
+        try:
+            valor = float(valor_entry.get())
+            deposit(current_user, valor, statement)
+            valor_entry.delete(0, END)
+        except ValueError:
+            messagebox.showerror("Erro", "Por favor, insira um valor válido para o depósito.")
+
+    def sacar():
+        try:
+            valor = float(valor_entry.get())
+            withdrawal(current_user, valor, statement)
+            valor_entry.delete(0, END)
+        except ValueError:
+            messagebox.showerror("Erro", "Por favor, insira um valor válido para o saque.")
+
+    depositar_button = Button(conta, text="Depositar", width=20, command=depositar)
+    depositar_button.pack(pady=5)
+
+    sacar_button = Button(conta, text="Sacar", width=20, command=sacar)
+    sacar_button.pack(pady=5)
+
+    sair_button = Button(conta, text="Sair", width=20, command=conta.destroy)
+    sair_button.pack(pady=5)
+
+    extrato_label = Label(conta, text="Extrato de Transações", font=("Verdana", "10", "italic", "bold"))
+    extrato_label.pack(pady=10)
+
+    columns = ('Tipo de Transação', 'Valor', 'Data')
+    tree = ttk.Treeview(conta, columns=columns, show='headings')
+
+    tree.heading('Tipo de Transação', text='Tipo de Transação')
+    tree.heading('Valor', text='Valor')
+    tree.heading('Data', text='Data')
+
+    tree.pack(pady=20, padx=20)
+
+    atualizar_treeview(current_user)
+
+    conta.mainloop()
 
 def cpf_validation(cpf):
     cpf = re.sub(r'[^0-9]', '', cpf)
@@ -317,10 +488,49 @@ def excluir_usuario():
     btn_cancelar = Button(excluir, text="Cancelar", width=20, command=excluir.destroy)
     btn_cancelar.pack( padx=10, pady=10)
 
+def search_and_update_password(cpf_entry, new_password_entry, top_window):
+    searchAlteration = cpf_entry.get()  
+    found = False  
+    
+    for searchCPF in users:
+        if searchCPF['cpf'] == searchAlteration:
+            newPassword = new_password_entry.get()  
+            searchCPF['senha'] = newPassword
+            messagebox.showinfo("Sucesso", f"A senha de {searchCPF['username']} foi atualizada com sucesso!")
+            save_account(users)
+            found = True  # Marca que o CPF foi encontrado
+            top_window.destroy()  
+            break 
+
+    if not found:
+        messagebox.showerror("Erro", "CPF não encontrado, operação cancelada!")
+
+def open_password_update_window():
+    top_window = Toplevel()
+    top_window.title("Alterar Senha")
+    top_window.geometry("400x300")
+
+    cpf_label = Label(top_window, text="Digite o CPF do Usuário:")
+    cpf_label.pack(pady=10)
+
+    cpf_entry = Entry(top_window, width=30)
+    cpf_entry.pack(pady=5)
+
+    new_password_label = Label(top_window, text="Digite a nova senha:")
+    new_password_label.pack(pady=10)
+
+    new_password_entry = Entry(top_window, width=30, show="*")  # "show" mascara a senha
+    new_password_entry.pack(pady=5)
+
+    update_button = Button(top_window, text="Alterar Senha", width=20, 
+                              command=lambda: search_and_update_password(cpf_entry, new_password_entry, top_window))
+    update_button.pack(pady=20)
+
+    top_window.mainloop()
+
 def sair():
     root.quit()
 
-# Criação da janela principal
 root = Tk()
 root.title("FinBank")
 
@@ -335,7 +545,6 @@ ascii_art = '''
 label_ascii = Label(root, text=ascii_art, font=("Courier", 10), padx=10, pady=10)
 label_ascii.pack()
 
-# Adicionando as opções de menu com botões
 btn_login = Button(root, text="Fazer Login", width=20, command=fazer_login)
 btn_login.pack(pady=5)
 
@@ -349,6 +558,9 @@ btn_pesquisar = Button(root, text="Pesquisar por CPF", width=20, command=pesquis
 btn_pesquisar.pack(pady=5)
 
 btn_excluir = Button(root, text="Excluir Usuário", width=20, command=excluir_usuario)
+btn_excluir.pack(pady=5)
+
+btn_excluir = Button(root, text="Pesquisar Usuario", width=20, command=open_password_update_window)
 btn_excluir.pack(pady=5)
 
 btn_sair = Button(root, text="Sair", width=20, command=sair)
