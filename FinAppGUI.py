@@ -560,7 +560,7 @@ btn_pesquisar.pack(pady=5)
 btn_excluir = Button(root, text="Excluir Usuário", width=20, command=excluir_usuario)
 btn_excluir.pack(pady=5)
 
-btn_excluir = Button(root, text="Pesquisar Usuario", width=20, command=open_password_update_window)
+btn_excluir = Button(root, text="Alterar Senha", width=20, command=open_password_update_window)
 btn_excluir.pack(pady=5)
 
 btn_sair = Button(root, text="Sair", width=20, command=sair)
