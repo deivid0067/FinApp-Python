@@ -3,6 +3,8 @@ from tkinter import messagebox
 from tkinter import ttk
 import uuid
 import re
+import datetime
+import os
 
 users = []
 user_db = 'users_db.txt'
@@ -47,7 +49,6 @@ def fazer_login():
     # Campo de Nome de Usuário ou E-mail
     username_or_email_label = Label(login, text="Nome de Usuário ou E-mail:")
     username_or_email_label.pack(pady=5)
-    
     username_or_email = Entry(login, width=30)
     username_or_email.pack(pady=5)
 
@@ -79,7 +80,6 @@ def cpf_validation(cpf):
             return False
 
     return True
-
 
 def email_validation(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
@@ -193,7 +193,6 @@ def criar_conta():
 
     cadastro.mainloop()
 
-
 def relatorio_usuarios():
 
     relatorio = Tk()
@@ -223,11 +222,100 @@ def relatorio_usuarios():
 
     relatorio.mainloop()
 
-def pesquisar_usuario():
-    messagebox.showinfo("Pesquisar por CPF", "Função de Pesquisa de Usuários chamada!")
+def search():
+    cpf_busca = username_user.get()  
+    for user in users:
+        if user['cpf'] == cpf_busca:
+            # Limpar as entradas anteriores
+            for row in tree.get_children():
+                tree.delete(row)
+            # Inserir os dados encontrados na Treeview
+            tree.insert("", "end", values=(user['username'], user['email'], user['saldo']))
+            break
+    else:
+        print("Usuário não encontrado.")
 
+def pesquisar_usuario():
+    pesquisa = Tk()
+    pesquisa.title('Pesquisar Usuário')
+    pesquisa.geometry('700x450')
+    
+    
+    search_label = Label(pesquisa, text="CPF")
+    search_label.pack(pady=5)
+
+    
+    global username_user
+    username_user = Entry(pesquisa, width=30)
+    username_user.pack(pady=5)
+
+    
+    title = Label(pesquisa, text="Relatório de Usuários", font=("Verdana", 10, "italic", "bold"), fg="blue", bg="#d6d6d6")
+    title.place(x=0, y=0)
+
+    
+    columns = ('Username', 'Email', 'Saldo')
+    global tree
+    tree = ttk.Treeview(pesquisa, columns=columns, show='headings')
+
+    tree.heading('Username', text='Username')
+    tree.heading('Email', text='Email')
+    tree.heading('Saldo', text='Saldo')
+
+    tree.pack(pady=30, padx=30)
+
+    
+    btn_pesquisar = Button(pesquisa, text="Pesquisar", width=20, command=search)
+    btn_pesquisar.pack(side=LEFT, padx=10, pady=10)  # Alinhado à esquerda
+
+    btn_sair_relatorio = Button(pesquisa, text="Sair", width=20, command=pesquisa.destroy)
+    btn_sair_relatorio.pack(side=LEFT, padx=10, pady=10)  # Alinhado à esquerda
+
+    pesquisa.mainloop()
+
+def excluir_conta():
+    cpf_user = cpf_entry.get()  
+    user_to_delete = None
+
+    for user in users:
+        if user['cpf'] == cpf_user:
+            user_to_delete = user
+            break
+
+    if user_to_delete:
+        confirmation = messagebox.askquestion("Confirmar exclusão", 
+                                             f"Tem certeza que deseja excluir a conta de {user_to_delete['username']} ({user_to_delete['cpf']})?")
+        if confirmation == 'yes':
+            users.remove(user_to_delete)
+            save_account(users)
+
+            user_statement_file = f"extrato_{user_to_delete['username']}.txt"
+            if os.path.exists(user_statement_file):
+                os.remove(user_statement_file)
+
+            messagebox.showinfo("Sucesso", f"Usuário {user_to_delete['username']} ({user_to_delete['cpf']}) excluído com sucesso!")
+        else:
+            messagebox.showinfo("Cancelado", "Exclusão cancelada!")
+    else:
+        messagebox.showerror("Erro", "Usuário não encontrado!")
+    
 def excluir_usuario():
-    messagebox.showinfo("Excluir Usuário", "Função de Excluir Usuário chamada!")
+    excluir = Tk()
+    excluir.title("Exclusão de Conta")
+    excluir.geometry('400x200')
+    
+    cpf_label = Label(excluir, text="Digite seu CPF para excluir sua conta:")
+    cpf_label.pack(pady=10)
+
+    global cpf_entry
+    cpf_entry = Entry(excluir, width=30)
+    cpf_entry.pack(pady=10)
+
+    btn_excluir = Button(excluir, text="Excluir Conta", width=20, command=excluir_conta)
+    btn_excluir.pack(padx=10, pady=10)
+
+    btn_cancelar = Button(excluir, text="Cancelar", width=20, command=excluir.destroy)
+    btn_cancelar.pack( padx=10, pady=10)
 
 def sair():
     root.quit()
@@ -256,7 +344,7 @@ btn_criar_conta.pack(pady=5)
 
 btn_relatorio = Button(root, text="Relatório de Usuários", width=20, command=relatorio_usuarios)
 btn_relatorio.pack(pady=5)
-
+ 
 btn_pesquisar = Button(root, text="Pesquisar por CPF", width=20, command=pesquisar_usuario)
 btn_pesquisar.pack(pady=5)
 

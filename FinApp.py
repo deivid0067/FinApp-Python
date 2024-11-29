@@ -17,7 +17,7 @@ users = []
 user_db = 'users_db.txt'
 
 def clear_console():
-    input('\nPressione Enter para finalizar...')
+    input('\nProsseguir!')
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def load_accounts(users):
@@ -43,7 +43,6 @@ def load_accounts(users):
         print("Banco de dados não encontrado, criando um novo arquivo...")
 load_accounts(users)
 
-
 def login():
     print('\nBem-vindo ao FinBank. Para fazer o login, digite seu nome de usuário ou e-mail e sua senha.')
 
@@ -63,20 +62,27 @@ def login():
         else:
             print('\n Credenciais Inválidas')
 
-
 def extract(current_user, deposit_values, statement):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    for deposit_value in deposit_values:
-
-        transaction = {
-            'type': 'Deposito',
-            'value': deposit_value,
-            'user': current_user['username'],
-            'id': str(uuid.uuid4()),  # Id da transação
-            'date': current_datetime
-        }
-
+    for value in deposit_values:
+        # Verifica se o valor é negativo para considerar como saque
+        if value < 0:
+            transaction = {
+                'type': 'Saque',
+                'value': value,
+                'user': current_user['username'],
+                'id': str(uuid.uuid4()),  
+                'date': current_datetime
+            }
+        else:
+            transaction = {
+                'type': 'Deposito',
+                'value': value,
+                'user': current_user['username'],
+                'id': str(uuid.uuid4()),  
+                'date': current_datetime
+            }
         statement.append(transaction)
         save_transaction(transaction)
 
@@ -127,7 +133,7 @@ def withdrawal(current_user, withdrawal_value, statement):
             save_account(users)
 
         except ValueError as vew:
-            print(f'Erro: {ve}')
+            print(f'Erro: {vew}')
 
 def deposit(current_user, deposit_value, statement): 
 
@@ -146,72 +152,86 @@ def deposit(current_user, deposit_value, statement):
 
 def account(current_user):
     statement = []
-
-    option = input(textwrap.dedent(f'''\nBem-vindo a aplicação FinApp!, {current_user['username']}
     
-    Seu Saldo: {current_user['saldo']}
+    while True:
+        option = input(textwrap.dedent(f'''\nBem-vindo a aplicação FinApp!, {current_user['username']}
     
-    Selecione a opção desejada:
+        Seu Saldo: {current_user['saldo']}
+                    
+        Selecione a opção desejada:
 
-    1 - Saque
-    2 - Depósito
-    3 - Extrato Bancário
-    4 - Sair da Aplicação
+        1 - Saque
+        2 - Depósito
+        3 - Extrato Bancário
+        4 - Sair do FinApp
 
-    '''))
-    
-    if option not in ['1', '2', '3', '4']:
+        '''))
 
-        print('\nSelecione uma opção Válida')
-    elif option == '1':
-        try:
-            withdrawal_value = float(input('\n Digite um valor para realizar o saque'))
-            withdrawal(current_user, withdrawal_value, statement)
-        except ValueError:
-            print("Erro: Por favor, digite um valor válido para o depósito (número).")
+        if option not in ['1', '2', '3', '4']:
+            print('\nSelecione uma opção Válida')
+            clear_console()
+            account(current_user)
+            break
+
+        elif option == '1':
+            try:
+                withdrawal_value = float(input('\n Digite um valor para realizar o saque: '))
+                withdrawal(current_user, withdrawal_value, statement)
+
+                clear_console()
+                account(current_user)
+                break
+            except ValueError:
+                print("Erro: Por favor, digite um valor válido para o depósito (número).")
 
 
-    elif option == '2':
-        try:
-            deposit_value = float(input('\nDigite o valor do depósito: '))
-            deposit(current_user, deposit_value, statement)
-        except ValueError:
-            print("Erro: Por favor, digite um valor válido para o depósito (número).")
+        elif option == '2':
+            try:
+                deposit_value = float(input('\nDigite o valor do depósito: '))
+                deposit(current_user, deposit_value, statement)
 
-    elif option == '3':
-        transactions = load_transactions(current_user['username'])  # Carrega as transações
+                clear_console()
+                account(current_user)
+                break
+            except ValueError:
+                print("Erro: Por favor, digite um valor válido para o depósito (número).")
 
-        os.system('cls')
+        elif option == '3':
+            transactions = load_transactions(current_user['username'])  # Carrega as transações
 
-        print('\n-------------------- EXTRATO BANCARIO --------------------')
+            os.system('cls')
 
-        if transactions:
-            table_extract = PrettyTable()
-            table_extract.field_names = ["ID", "Tipo", "Valor (R$)", "Data"]
+            print('\n-------------------- EXTRATO BANCARIO --------------------')
 
-            # Adiciona todas as transações à tabela
-            for transaction in transactions:
-                table_extract.add_row([transaction['id'], transaction['type'],
-                                       f"R$ {transaction['value']:.2f}", transaction['date']])
+            if transactions:
+                table_extract = PrettyTable()
+                table_extract.field_names = ["ID", "Tipo", "Valor (R$)", "Data"]
 
-            print(table_extract)  # Exibe a tabela inteira de transações
+                # Adiciona todas as transações à tabela
+                for transaction in transactions:
+                    table_extract.add_row([transaction['id'], transaction['type'],
+                                            f"R$ {transaction['value']:.2f}", transaction['date']])
+                print(table_extract)  # Exibe a tabela inteira de transações
 
-            # Pergunta se deseja continuar ou sair
-            optionContinue = input('\nAperte Enter, se deseja retornar para o Menu principal, caso contrario pressione outra tecla')
-            if optionContinue in ['', ' ']:
-                account(current_user)  # Volta ao menu principal
+                # Pergunta se deseja continuar ou sair
+                optionContinue = input('\nAperte Enter, se deseja retornar para o Menu principal, caso contrario pressione outra tecla')
+                if optionContinue in ['', ' ']:
+                    os.system('cls')
+                    continue
+                else:
+                    print('Finalizando')
+                    break
+
             else:
-                print('Finalizando')
+                print('Nenhuma transação, Encontrada!')
 
-        else:
-            print('Nenhuma transação, Encontrada!')
-
-    elif option == '4':
-        print('teste')
+        elif option == '4':
+            break
 
 def cpf_validation(cpf):
-    cpf = re.sub(r'[^0-9.-]', '', cpf)
-    if len(cpf) != 14:
+    cpf = re.sub(r'[^0-9]', '', cpf)
+    
+    if len(cpf) != 11:
         return False
 
     if cpf == cpf[0] * 11:
@@ -258,31 +278,36 @@ def delete_user():
             print("\nExclusão cancelada!")
     else:
         print("\nUsuário não encontrado!")
-
+        
 def create_account():
-    print('\nSeja Bem-vindo ao FinBank, Preencha as informações abaixo para criar sua conta.')
-
+    
     user_id = str(uuid.uuid4())
 
     while True:
+        print('\nSeja Bem-vindo ao FinBank, Preencha as informações abaixo para criar sua conta.')
+
         username = input('\nDigite seu nome: ')
         if username in ['', ' ']:
             print('\nVocê precisa inserir um nome de usuário válido!')
+            clear_console()
             continue
 
         cpf = input('\nDigite seu CPF: ')
         if not cpf_validation(cpf):
             print('\nCPF inválido, tente novamente!')
+            clear_console()
             continue
 
         email = input('\nInsira um Email: ')
         if not email_validation(email):
             print('\nE-mail inválido, insira o mesmo corretamente!')
+            clear_console()
             continue
 
         senha = input('\nDigite uma senha: ')
         if not senha.strip():
             print('\n Você não pode colocar espaços em branco na senha! ')
+            clear_console()
             continue
 
         break
@@ -329,8 +354,9 @@ def save_account(users):
 
 def menu():
 
-    while True:
 
+    while True:
+        
         print('''
 ███████╗██╗███╗   ██╗██████╗  █████╗ ███╗   ██╗██╗  ██╗
 ██╔════╝██║████╗  ██║██╔══██╗██╔══██╗████╗  ██║██║ ██╔╝
@@ -340,6 +366,7 @@ def menu():
 ╚═╝     ╚═╝╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
                                                        ''')
 
+        
         selectOption = input(textwrap.dedent('''
     Bem Vindo ao FinBank. Selecione uma das opções para continuar:
 
@@ -348,11 +375,15 @@ def menu():
     (3) - Relatório de Usuários Cadastrados
     (4) - Pesquisar usuarios por CPF
     (5) - Excluir Usuário 
-    (6) - Sair da aplicação
+    (6) - Mudar Senha do usuário
+    (7) - Finalizar App
     ===> '''))
-
-        if selectOption not in ['1', '2', '3', '4', '5', '6']:
+        
+        if selectOption not in ['1', '2', '3', '4', '5', '6', '7']:
             print('\nEscolha uma opção válida!')
+            clear_console()
+            menu()
+            break
         elif selectOption == '1':
             login()
             break
@@ -365,7 +396,7 @@ def menu():
             clear_console()
         elif selectOption == '4':
 
-            search = input('Digite o CPF Pra receber informações do Usuário')
+            search = input('Digite o CPF Pra receber informações do Usuário: ')
             for searchUser in users:
                 if searchUser['cpf'] == search:
                     print(textwrap.dedent(f'''
@@ -377,5 +408,29 @@ def menu():
             
         elif selectOption == '5':
             delete_user()
+            clear_console()
+            menu()
             sys.exit(0)
+
+        elif selectOption == '6':
+            searchAlteration = input('Digite o CPF para receber informações do Usuário: ')
+            found = False  # Variável para controlar se o CPF foi encontrado
+    
+            for searchCPF in users:
+                if searchCPF['cpf'] == searchAlteration:
+                    newPassword = input(f'{searchCPF["username"]}. Digite uma nova senha: ')
+                    searchCPF['senha'] = newPassword
+                    print(f"A senha de {searchCPF['username']} foi atualizada com sucesso!")
+                    save_account(users)
+                    clear_console()
+                    menu()
+                    found = True  # Marca que o CPF foi encontrado
+                    break  # Sai do loop após encontrar e atualizar o usuário
+            
+            # Se o CPF não for encontrado após o loop
+            if not found:
+                print('CPF não encontrado, operação cancelada!')
+        
+        else:
+            break
 menu()
